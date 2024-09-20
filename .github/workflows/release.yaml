@@ -23,6 +23,7 @@ jobs:
       - name: Build and Push the Helm Charts to GitHub Container Registry
         uses: JimCronqvist/action-helm-chart-repo@master
         with:
+          chartsPath: "charts/"
           token: ${{ secrets.GITHUB_TOKEN }}
 
 
