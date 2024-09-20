@@ -50,7 +50,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
       - name: Download packaged charts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: packaged-charts
           path: dist
