@@ -37,6 +37,9 @@ jobs:
   push:
     name: Push Helm Charts to GHCR
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs: package  # Waits for both 'package' job to complete
     steps:
       - name: Login to GitHub Container Registry
