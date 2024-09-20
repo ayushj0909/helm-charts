@@ -1,35 +1,70 @@
-name: Release
+name: Helm Publish
 on:
   push:
-    branches: [ main ]
+    branches: [ 'master', 'main' ]
+  workflow_dispatch:
+
 jobs:
-  release:
+  helm:
     permissions:
+      contents: read
       packages: write
-      contents: write
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - name: Git Checkout
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
         with:
-          fetch-depth: 0
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-      - name: Helm Installation
-        uses: azure/setup-helm@v1.1
+          version: v3.12.3 # Lock version for now, helm v3.13.0 contains bugs related to oci that will be fixed in v3.13.1. https://github.com/helm/helm/issues/12423
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push the Helm Charts to GitHub Container Registry
+        uses: JimCronqvist/action-helm-chart-repo@master
         with:
-          version: v3.16.0
-      - name: Add helm repositories
-        run: |
-          for dir in $(ls -d charts/*/); do
-            helm dependency list $dir 2> /dev/null | tail +2 | head -n -1 | awk '{ print "helm repo add " $1 " " $3 }' | while read cmd; do $cmd; done
-          done
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.6.0
-        with:
-          pages_branch: gh-pages
-        env:
-          CR_SKIP_EXISTING: true
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+#name: Release
+#permissions:
+#  packages: write
+#  contents: read
+#on:
+#  push:
+#    branches: [ main ]
+#jobs:
+#  release:
+#    runs-on: ubuntu-20.04
+#    steps:
+#      - name: Git Checkout
+#        uses: actions/checkout@v2
+#        with:
+#          fetch-depth: 0
+#      - name: Configure Git
+#        run: |
+#          git config user.name "$GITHUB_ACTOR"
+#          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+#      - name: Helm Installation
+#        uses: azure/setup-helm@v1.1
+#        with:
+#          version: v3.16.0
+#      - name: Add helm repositories
+#        run: |
+#          for dir in $(ls -d charts/*/); do
+#            helm dependency list $dir 2> /dev/null | tail +2 | head -n -1 | awk '{ print "helm repo add " $1 " " $3 }' | while read cmd; do $cmd; done
+#          done
+#      - name: Login to GitHub Container Registry
+#        uses: docker/login-action@v3
+#        with:
+#          registry: ghcr.io
+#          username: ${{ github.actor }}
+#          password: ${{ secrets.GITHUB_TOKEN }}
+#      - name: Run chart-releaser
+#        uses: helm/chart-releaser-action@v1.6.0
+#        with:
+#          pages_branch: gh-pages
+#        env:
+#          CR_SKIP_EXISTING: true
+#          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
