@@ -80,6 +80,6 @@ jobs:
       - name: Release Helm Charts
         uses: helm/chart-releaser-action@v1.6.0
         with:
-          chart-dir: dist
+          chart_dir: dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
