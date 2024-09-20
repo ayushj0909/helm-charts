@@ -1,0 +1,67 @@
+################################################
+# Service discovery config
+###############################################
+# Contains the values for the default 'app.kubernetes.io/' labels for each app's service.
+# VM agent uses these labels to discover the services in the cluster for scraping
+# Modify these if you have your own installation of the apps. Else, leave them be.
+sdConfig:
+  nodeExporter:
+    # kubectl get service <node-exporter-service-name> -n <namespace> -o=jsonpath='{.metadata.labels.app\.kubernetes\.io/name}'
+    # Default value for app.kubernetes.io/name label is 'prometheus-node-exporter'
+    name:
+    # Default port name is 'metrics'
+    metricsPortName:
+    # List of namespaces the service is installed/running in.
+    namespaces: []
+
+  kubeStateMetrics:
+    # kubectl get service <ksm-service-name> -n <namespace> -o=jsonpath='{.metadata.labels.app\.kubernetes\.io/name}'
+    # Default value is kube-state-metrics
+    name:
+    # kubectl get service <ksm-service-name> -n <namespace> -o=jsonpath='{.metadata.labels.app\.kubernetes\.io/instance}'
+    instance:
+    # List of namespaces the service is installed in.
+    namespaces: []
+
+##############################################
+# Dependent charts' configuration
+##############################################
+# This chart ships kube-state-metrics and prometheus-node-exporter alongside victoria-metrics-agent
+# See Chart.yaml for chart versions and repo URLs.
+kube-state-metrics:
+  # To enable/disable kube-state-metrics subchart
+  # Recommended value: True
+  # If disabled, service label values need to be supplied for service discovery
+  enabled: True
+
+prometheus-node-exporter:
+  # To enable/disable kube-state-metrics subchart
+  # Install only if no node exporters are present in the cluster.
+  # If disabled, service label values need to be supplied for service discovery
+  enabled: False
+
+victoria-metrics-agent:
+  # Using custom configMap present in ./templates
+  configMap: vmagent-config
+  # Amnic's metrics ingester's URL
+  remoteWriteUrls:
+    - https://metrics.amnic.com/z/api/v1/push
+  extraArgs:
+    remoteWrite.bearerToken: ''
+    promscrape.maxScrapeSize: "33554432"
+    remoteWrite.relabelConfig: "/tmp/relabel/global-relabel.yml"
+  # Relabeling-config (global-relabel.yml) is present in the vmagent-config cm
+  extraVolumes:
+    - name: amnic-relabel
+      configMap:
+        name: vmagent-config
+  extraVolumeMounts:
+    - name: amnic-relabel
+      mountPath: /tmp/relabel
+      
+####################################################
+# Amnic relabelling config
+####################################################
+amnic_installationID: ''
+amnic_clusterID: ''
+amnic_metricsRegex: (container.*allocation|container_cpu_cfs_.*|container_cpu_usage_seconds_total|container_fs_limit_bytes|container_fs_usage_bytes|container_memory_working_set_bytes|container_network_receive_bytes_total|container_network_transmit_bytes_total|coredns_dns_request_duration_seconds_bucket|coredns_dns_requests_total|coredns_dns_responses_total|coredns_forward_requests_total|karpenter.*|kube_.*_info|.*_created|kube_.*labels|kube_daemonset.*|kube_deployment_.*|kube_node.*|kube_persistentvolume.*|kube_pod.*|kube_replicaset.*|kube_statefulset.*|kubecost.*|kubelet_active_pods|kubelet_desired_pods|kubelet_node_name|kubelet_pod_start_duration_seconds_sum|kubelet_restarted_pods_total|kubelet_running_.*|kubelet_running_container_count|kubelet_running_pod_count|kubelet_started_pods_total|kubelet_volume_stats.*|kubelet_working_pods|kubernetes_build_info|kubernetes_feature_enabled|machine_.*|node_cpu_seconds_total|node_disk_info|node_disk_io_time_seconds_total|node_disk_io_time_weighted_seconds_total|node_filesystem_avail_bytes|node_filesystem_size_bytes|node_gpu_count|node_load.*|node_load1|node_memory_Buffers_bytes|node_memory_Cached_bytes|node_memory_MemAvailable_bytes|node_memory_MemFree_bytes|node_memory_MemTotal_bytes|node_memory_Slab_bytes|node_network_receive_bytes_total|node_network_transmit_bytes_total|node_vmstat_oom_kill|node_vmstat_pgmajfault|node_disk_read_bytes_total|node_disk_written_bytes_total|opencost.*|.*_cost|DCGM.*).*
