@@ -1,7 +1,7 @@
 name: Helm Publish
 on:
   push:
-    branches: [ 'main' ]
+    branches: [ 'main', 'feat/ghcr-release-workflow' ]
 jobs:
   setup:
     name: Setup Helm
@@ -13,34 +13,53 @@ jobs:
         uses: azure/setup-helm@v4.2.0
         with:
           version: v3.16.0
+
   package:
     name: Package Helm Charts
     runs-on: ubuntu-latest
-    needs: setup  # Waits for 'setup' job to complete
+    needs: setup
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Package Helm Charts
+
+      - name: Find Changed Charts
+        id: find-charts
         shell: bash
         run: |
-          mkdir -p dist  # Ensure dist directory exists
-          find charts/ -type f -name 'Chart.yaml' | sed -r 's|/[^/]+$||' | sort | uniq | xargs --verbose -L 1 helm dep up
-          for subdir in charts/*/; do
-              echo "$subdir"
-              helm package "$subdir" -u -d dist
-          done
+          # Find which charts have changed based on 'Chart.yaml'
+          CHANGED_CHARTS=$(git diff --name-only HEAD~1 HEAD | grep '^charts/.*/Chart.yaml' | sed -r 's|/Chart.yaml||')
+          if [ -z "$CHANGED_CHARTS" ]; then
+            echo "No chart changes detected."
+            echo "CHARTS_CHANGED=false" >> $GITHUB_ENV
+          else
+            echo "Changed charts: $CHANGED_CHARTS"
+            echo "CHARTS_CHANGED=true" >> $GITHUB_ENV
+            echo "$CHANGED_CHARTS" > changed_charts.txt
+          fi
+
+      - name: Package Helm Charts
+        if: env.CHARTS_CHANGED == 'true'
+        shell: bash
+        run: |
+          mkdir -p dist
+          while IFS= read -r chart; do
+              helm dep up "$chart"
+              helm package "$chart" -u -d dist
+          done < changed_charts.txt
+
       - name: Archive dist directory
         uses: actions/upload-artifact@v4
         with:
           name: packaged-charts
           path: dist
+
   push:
     name: Push Helm Charts to GHCR
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    needs: package  # Waits for both 'package' job to complete
+    needs: package
     steps:
       - name: Login to GitHub Container Registry
         shell: bash
@@ -49,11 +68,13 @@ jobs:
           REGISTRY: "ghcr.io/${{ github.repository }}"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
+
       - name: Download packaged charts
         uses: actions/download-artifact@v4
         with:
           name: packaged-charts
           path: dist
+
       - name: Push packages
         shell: bash
         working-directory: dist
@@ -64,24 +85,3 @@ jobs:
           done
         env:
           REGISTRY: "ghcr.io/${{ github.repository }}"
-
-  release:
-    name: Release Helm Charts to GitHub Pages
-    runs-on: ubuntu-latest
-    needs: package  # Waits for 'package' job to complete
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Download packaged charts
-        uses: actions/download-artifact@v4
-        with:
-          name: packaged-charts
-          path: dist
-      - name: Release Helm Charts
-        uses: helm/chart-releaser-action@v1.6.0
-        with:
-          charts_dir: dist
-          skip_existing: true
-          mark_as_latest: false
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
