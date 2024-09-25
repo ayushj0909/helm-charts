@@ -39,6 +39,16 @@ prometheus-node-exporter:
   # Install only if no node exporters are present in the cluster.
   # If disabled, service label values need to be supplied for service discovery
   enabled: False
+  # To ensure node-exporter is not scheduled on the fargate i
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: eks.amazonaws.com/compute-type
+                operator: NotIn
+                values:
+                  - fargate
 
 victoria-metrics-agent:
   # Using custom configMap present in ./templates
