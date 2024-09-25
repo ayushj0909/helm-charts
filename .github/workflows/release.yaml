@@ -30,13 +30,25 @@ jobs:
         id: find-charts
         shell: bash
         run: |
-          # If no previous commit exists, fallback to checking the initial state
+          set -e  # Exit on any error
+          # Debug: Show current state of the git tree
+          git status
+          git log --oneline -2
+      
+          # Check if previous commit exists
           if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            echo "Previous commit exists. Checking for changed charts."
             CHANGED_CHARTS=$(git diff --name-only HEAD~1 HEAD | grep '^charts/.*/Chart.yaml' | sed -r 's|/Chart.yaml||')
           else
-            CHANGED_CHARTS=$(git ls-tree --name-only HEAD charts/)
+            echo "No previous commit found. Listing all charts."
+            CHANGED_CHARTS=$(find charts/*/ -type f -name 'Chart.yaml' | sed -r 's|/Chart.yaml||')
           fi
-
+      
+          # Debug: Print the detected changes
+          echo "Detected changes:"
+          echo "$CHANGED_CHARTS"
+      
+          # Store result in env variable and check if any changes were detected
           if [ -z "$CHANGED_CHARTS" ]; then
             echo "No chart changes detected."
             echo "CHARTS_CHANGED=false" >> $GITHUB_ENV
