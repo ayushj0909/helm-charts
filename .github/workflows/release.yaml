@@ -9,6 +9,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch full history so HEAD~1 is available
       - name: Install Helm
         uses: azure/setup-helm@v4.2.0
         with:
@@ -21,13 +23,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch full history so HEAD~1 is available
 
       - name: Find Changed Charts
         id: find-charts
         shell: bash
         run: |
-          # Find which charts have changed based on 'Chart.yaml'
-          CHANGED_CHARTS=$(git diff --name-only HEAD~1 HEAD | grep '^charts/.*/Chart.yaml' | sed -r 's|/Chart.yaml||')
+          # If no previous commit exists, fallback to checking the initial state
+          if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            CHANGED_CHARTS=$(git diff --name-only HEAD~1 HEAD | grep '^charts/.*/Chart.yaml' | sed -r 's|/Chart.yaml||')
+          else
+            CHANGED_CHARTS=$(git ls-tree --name-only HEAD charts/)
+          fi
+
           if [ -z "$CHANGED_CHARTS" ]; then
             echo "No chart changes detected."
             echo "CHARTS_CHANGED=false" >> $GITHUB_ENV
